@@ -1,8 +1,8 @@
 # Todo app built in Rust
 
-![Blank State](./assets/empty_state.png)
-![Todo Creation](./assets/todo_creation.png)
-![Todo List](./assets/todo_list.png)
+![Blank State](./images/empty_state.png)
+![Todo Creation](./images/todo_creation.png)
+![Todo List](./images/todo_list.png)
 
 **Dependencies**
 <br/>
