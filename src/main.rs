@@ -79,7 +79,7 @@ impl Todo {
          ch = getch() as u8 as char;
       }
       
-      if content.trim().len() > 0 { self.add_todo(_Todo::new(content.trim().to_string())) };
+      if content.trim().len() > 0 && ch as u8 != 27 { self.add_todo(_Todo::new(content.trim().to_string())) };
       noecho();
    }
    
