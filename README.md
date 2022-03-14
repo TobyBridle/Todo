@@ -1,4 +1,9 @@
 # Todo app built in Rust
+
+![Blank State](./assets/empty_state.png)
+![Todo Creation](./assets/todo_creation.png)
+![Todo List](./assets/todo_list.png)
+
 **Dependencies**
 <br/>
 *ncurses will be installed automatically when building*
