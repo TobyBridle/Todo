@@ -1,21 +1,26 @@
 use ncurses::*;
 
-use std::io::{Write, BufReader, BufRead, BufWriter};
+use std::io::{Write, BufWriter};
 use std::fs::File;
+
+mod utils;
+use crate::utils::file::utils::*;
+use crate::utils::print::utils::*;
 
 //==============================//
 //    SINGULAR TODO STRUCT      //
 //==============================//
 
-#[derive(std::fmt::Debug, Copy, Clone)]
-enum TODOS
+#[derive(std::fmt::Debug, Copy, Clone, PartialEq)]
+pub enum TodoState
 {
+   Other,
    NotDone,
-   Done,
    InProgress,
+   Done,
 }
 
-impl std::fmt::Display for TODOS
+impl std::fmt::Display for TodoState
 {
    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result
    {
@@ -25,9 +30,9 @@ impl std::fmt::Display for TODOS
 }
 
 #[derive(Clone)]
-struct _Todo {
+pub struct _Todo {
    id: i32,
-   active: TODOS,
+   active: TodoState,
    content: String,
 }
 
@@ -36,7 +41,7 @@ impl _Todo
    fn new(content: String) -> _Todo {
       _Todo {
          id: -1,
-         active: TODOS::NotDone,
+         active: TodoState::NotDone,
          content,
       }
    }
@@ -46,7 +51,7 @@ impl _Todo
 //    TODO STRUCT CONTAINER     //
 //==============================//
 
-struct Todo
+pub struct Todo
 {
    todos: Vec<_Todo>,
    history: Vec<_Todo>,
@@ -87,14 +92,14 @@ impl Todo {
    {
       if self.todos.len() == 0 { return; }
       let index = self.todos.iter().position(|todo| todo.id == id).unwrap();
-      if matches!(self.todos[index].active, TODOS::Done) {self.todos[index].active = TODOS::NotDone} else { self.todos[index].active = TODOS::Done};
+      if matches!(self.todos[index].active, TodoState::Done) {self.todos[index].active = TodoState::NotDone} else { self.todos[index].active = TodoState::Done};
    }
    
    fn set_in_progress(&mut self, id: i32)
    {
       if self.todos.len() == 0 { return; }
       let index = self.todos.iter().position(|todo| todo.id == id).unwrap();
-      if(matches!(self.todos[index].active, TODOS::InProgress)) { self.todos[index].active = TODOS::NotDone} else { self.todos[index].active = TODOS::InProgress };
+      if(matches!(self.todos[index].active, TodoState::InProgress)) { self.todos[index].active = TodoState::NotDone} else { self.todos[index].active = TodoState::InProgress };
    }
    
    fn remove_todo(&mut self, id: usize) -> bool
@@ -125,10 +130,10 @@ impl Todo {
       for todo in self.todos.clone()
       {
          let active = 
-            if matches!(todo.active, TODOS::Done) {"Done: "}
-            else if matches!(todo.active, TODOS::NotDone) {"NOT Done: "}
+            if matches!(todo.active, TodoState::Done) {"Done: "}
+            else if matches!(todo.active, TodoState::NotDone) {"Not Done: "}
             else {"IN PROGRESS: "};
-         writer.write(format!("{} {}\n", active, todo.content).as_bytes()).unwrap();
+         writer.write(format!("{}{}\n", active, todo.content.trim()).as_bytes()).unwrap();
       }
       writer.flush().expect("Could not write to file!");
    }
@@ -145,42 +150,11 @@ pub const SELECT: i16 = 1;
 pub const MENU_BAR: i16 = 2;
 pub const COMPLETED: i16 = 3;
 
-pub const MENU_BAR_SIZE: usize = 3;
-
-fn load_from_file(file_path: &str, todo_container: &mut Todo) -> Result<(), std::io::Error>
-{
-   let file = File::open(file_path)?;
-   let reader = BufReader::new(file);
-   
-   for line in reader.lines() {
-      let _line = line?.clone();
-      let active = 
-      {
-         if _line.starts_with("NOT Done: ") { TODOS::NotDone }
-         else if _line.starts_with("Done: ") { TODOS::Done }
-         else { TODOS::InProgress }
-      };
-      
-      todo_container.add_todo(_Todo { id: todo_container.todos.len() as i32, content: _line[active.to_string().len()+2..].to_string(), active });
-   }
-   
-   Ok(())
-}
-
 fn navigate_up(todo_len: usize, cursor_position: usize) -> usize
 {
    if todo_len == 0 { return 0 };
    if todo_len- 1 == cursor_position { return cursor_position };
    return cursor_position + 1;
-}
-
-fn print_controls()
-{
-   attron(COLOR_PAIR(MENU_BAR));
-   addstr("Toggle Todo State (Enter)\tMove Down (J)\tMove Up (K)\tQuit (Q)\tUndo most recent delete (U)");
-   mv(1, 0);
-   addstr("Add New Todo (A)\t\tRemove Todo (R)\t\t\tSet Todo to In-Progress (D)");
-   attroff(COLOR_PAIR(MENU_BAR));
 }
 
 fn main()
@@ -203,25 +177,31 @@ fn main()
       history: Vec::new(),
    };
    
+   let mut controller = PrintController::new();
+   
    load_from_file(FILE_PATH, &mut todos);
 
    let mut key;
    while run
    {
       mv(0, 0);
-      print_controls();
+      let spacing = print_controls(&controller);
+      let mut index: i32 = -1;
       if todos.todos.len() == 0
       {
-         mv(MENU_BAR_SIZE as i32, 0);
+         mv(spacing as i32, 0);
          attron(COLOR_PAIR(SELECT));
          addstr("You have no TODOs, try creating some by pressing `a`");
          attroff(COLOR_PAIR(SELECT));
       }
-      for (index, todo) in todos.todos.iter().enumerate()
+      
+      for todo in todos.todos.iter()
       {
-         let state = if matches!(todo.active, TODOS::NotDone) {"- [ ]\t"} else if matches!(todo.active, TODOS::InProgress) {"- [-]\t"} else {"- [x]\t"};
-         let hl: i16 = if index == cursor_position {SELECT} else if matches!(todo.active, TODOS::Done) {COMPLETED} else {NO_SELECT};
-         mv((index + MENU_BAR_SIZE) as i32, 0); // Set Cursor to Beginning of next Line
+         if controller.tab != todo.active && controller.tab != TodoState::Other { continue; }
+         index += 1;
+         let state = if matches!(todo.active, TodoState::NotDone) {"- [ ]\t"} else if matches!(todo.active, TodoState::InProgress) {"- [-]\t"} else {"- [x]\t"};
+         let hl: i16 = if index as usize == cursor_position {SELECT} else if matches!(todo.active, TodoState::Done) {COMPLETED} else {NO_SELECT};
+         mv(index + spacing as i32, 0); // Set Cursor to Beginning of next Line
          
          attron(COLOR_PAIR(hl));
          addstr(state);
@@ -242,6 +222,7 @@ fn main()
          'u' => { let pos = todos.undo(); cursor_position  = if pos == -1 {cursor_position} else {pos as usize}}
          'q' => { run = false; },
          's' => { todos.save(FILE_PATH) }
+         '\t' => { controller.cycle_tab(); cursor_position = 0; }
          _ => { continue; }
       }
       todos.save(FILE_PATH);
