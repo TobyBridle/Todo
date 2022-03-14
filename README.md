@@ -1,6 +1,8 @@
 # Todo app built in Rust
 **Dependencies**
+<br/>
 *ncurses will be installed automatically when building*
+<br/>
 `rust`
 `ncurses`
 
