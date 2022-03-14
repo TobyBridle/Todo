@@ -138,7 +138,7 @@ impl Todo {
 //          MAIN METHOD         //
 //==============================//
 
-pub const FILE_PATH: &str = "/Users/tobybridle/.config/todo/todos.todo";
+pub const FILE_PATH: &str = "PATH_TO_YOUR_FILE.todo";
 
 pub const NO_SELECT: i16 = 0;
 pub const SELECT: i16 = 1;
