@@ -7,15 +7,16 @@
 
 **Dependencies**
 <br/>
-*ncurses will be installed automatically when building*
+*These will be installed automatically when building*
 <br/>
-`rust`
-`ncurses`
+- `ncurses` (Used for creating the TUI)
+- `dialoguer` (Used for input handling since the ncurses library didn't provide the desired features)
 
 ## Setup
-1. Open `src/main.rs` in your favourite text-editor
-2. Replace `FILE_PATH` with the path to a file which will store your files
+1. [Install Rust](https://www.rust-lang.org/tools/install)
+2. Set the environment variable `TODO_FILE_LOCATION` to the file which will store your todos
 3. Build the project
 ```console
 $ cargo build --release
-``` 
+```
+4. This will have created a file in `/target/release` called `td`, run that executable and you're good to go!

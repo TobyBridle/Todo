@@ -1,5 +1,5 @@
-
-use ncurses::*;
+use ncurses::*; 
+use dialoguer::Input;
 
 use std::io::{Write, BufWriter};
 use std::fs::File;
@@ -70,24 +70,24 @@ impl Todo {
    {
       clear();
       echo();
+      curs_set(CURSOR_VISIBILITY::CURSOR_VISIBLE);
       mv(0, 0);
+
       attron(COLOR_PAIR(SELECT));
-      addstr("Add a Todo: (ESC to exit)");
+      addstr("Add a Todo: (Enter without text to exit)");
       attroff(COLOR_PAIR(SELECT));
       mv(1, 0);
+      refresh();
       
-      let mut content: String = String::new();
-      let mut ch: char = getch() as u8 as char;
-      
-      while (ch != '\n' && ch as u8 != 27)
-      {
-         content.push(ch);
-         ch = getch() as u8 as char;
-      }
-      
-      noecho();
+      let content: String = Input::new()
+                             .allow_empty(true)
+                             .interact_text()
+                             .unwrap();
 
-      if content.trim().len() > 0 && ch as u8 != 27
+      noecho();
+      curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
+
+      if content.trim().len() > 0
       {
          self.add_todo(_Todo::new(content.trim().to_string()));
          return true;
@@ -117,7 +117,7 @@ impl Todo {
       return cursor_position;
    }
    
-   fn remove_todo(&mut self, length: usize, id: i32, controller: &PrintController, cursor_position: usize) -> usize
+   fn remove_todo(&mut self, length: usize, id: i32, cursor_position: usize) -> usize
    {
       if length == 0 || id < 0 { return 0; }
 
@@ -191,6 +191,7 @@ fn main()
 
    initscr();
    noecho();
+   keypad(stdscr(), true);
    curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
    
    start_color();
@@ -251,7 +252,7 @@ fn main()
          'j' => { cursor_position = navigate_down(mapping.len(), cursor_position)}
          '\n' => { cursor_position = todos.toggle_todo(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32 } else { -1 }, &controller, cursor_position); }
          'a' => { cursor_position = if todos.add_todo_prompt() { mapping.len() } else { cursor_position } }
-         'r' => { cursor_position = todos.remove_todo(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32} else { -1 }, &controller, cursor_position) }
+         'r' => { cursor_position = todos.remove_todo(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32} else { -1 }, cursor_position) }
          'd' => { cursor_position = todos.set_in_progress(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32} else { -1}, &controller, cursor_position)}
          'u' => { let pos = todos.undo(mapping.len()); cursor_position  = if pos == -1 {cursor_position} else {pos as usize}}
          'q' => { run = false; },

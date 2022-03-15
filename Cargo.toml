@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 ncurses = "5.101.0"
+dialoguer = "0.10.0"
 
 [lib]
 name = "todo"
