@@ -1,3 +1,4 @@
+
 use ncurses::*;
 
 use std::io::{Write, BufWriter};
@@ -65,7 +66,7 @@ impl Todo {
       self.todos.push(todo);
    }
    
-   pub fn add_todo_prompt(&mut self)
+   pub fn add_todo_prompt(&mut self) -> bool
    {
       clear();
       echo();
@@ -84,42 +85,65 @@ impl Todo {
          ch = getch() as u8 as char;
       }
       
-      if content.trim().len() > 0 && ch as u8 != 27 { self.add_todo(_Todo::new(content.trim().to_string())) };
       noecho();
+
+      if content.trim().len() > 0 && ch as u8 != 27
+      {
+         self.add_todo(_Todo::new(content.trim().to_string()));
+         return true;
+      };
+      return false;
    }
    
-   fn toggle_todo(&mut self, id: i32)
+   fn toggle_todo(&mut self, length: usize, id: i32, controller: &PrintController, cursor_position: usize) -> usize
    {
-      if self.todos.len() == 0 { return; }
+      if length == 0 || id < 0 { return 0; }
       let index = self.todos.iter().position(|todo| todo.id == id).unwrap();
       if matches!(self.todos[index].active, TodoState::Done) {self.todos[index].active = TodoState::NotDone} else { self.todos[index].active = TodoState::Done};
+
+      if (controller.tab == TodoState::Other) { return cursor_position }
+      else if cursor_position + 1 == length && cursor_position > 0 { return cursor_position - 1 }
+      return cursor_position;
    }
    
-   fn set_in_progress(&mut self, id: i32)
+   fn set_in_progress(&mut self, length: usize, id: i32, controller: &PrintController, cursor_position: usize) -> usize
    {
-      if self.todos.len() == 0 { return; }
+      if length == 0 || id < 0 { return 0; }
       let index = self.todos.iter().position(|todo| todo.id == id).unwrap();
       if(matches!(self.todos[index].active, TodoState::InProgress)) { self.todos[index].active = TodoState::NotDone} else { self.todos[index].active = TodoState::InProgress };
-   }
-   
-   fn remove_todo(&mut self, id: usize) -> bool
-   {
-      if self.todos.len() == 0 { return false }
 
-      self.history.push(self.todos[id].clone());
-      self.todos.remove(id);
-      clear();
-      return true;
+      if (controller.tab == TodoState::Other) { return cursor_position }
+      else if cursor_position + 1 == length && cursor_position > 0 { return cursor_position - 1 }
+      return cursor_position;
    }
    
-   fn undo(&mut self) -> i32
+   fn remove_todo(&mut self, length: usize, id: i32, controller: &PrintController, cursor_position: usize) -> usize
+   {
+      if length == 0 || id < 0 { return 0; }
+
+      self.history.push(self.todos[id as usize].clone());
+      self.todos.remove(id as usize);
+      
+      for i in (id as usize)..self.todos.len()
+      {
+         self.todos[i].id -= 1;
+      }
+      
+      clear();
+
+      if cursor_position + 1 == length && cursor_position > 0 { return cursor_position - 1 }
+      return cursor_position;
+   }
+   
+   fn undo(&mut self, length: usize) -> i32
    {
       if(self.history.len() == 0) { return -1 }
-      let prev_todo: _Todo = self.history.pop().unwrap();
-      if self.todos.len() < prev_todo.id as usize {self.todos.push(prev_todo)} else {self.todos.insert(prev_todo.id as usize, prev_todo)};
+      let mut prev_todo: _Todo = self.history.pop().unwrap();
+      prev_todo.id = self.todos.len() as i32;
+      self.todos.push(prev_todo);
 
       clear();
-      return (self.todos.len() - 1) as i32;
+      return length as i32;
    }
    
    fn save(&self, file_path: &str)
@@ -132,7 +156,7 @@ impl Todo {
          let active = 
             if matches!(todo.active, TodoState::Done) {"Done: "}
             else if matches!(todo.active, TodoState::NotDone) {"Not Done: "}
-            else {"IN PROGRESS: "};
+            else {"In Progress: "};
          writer.write(format!("{}{}\n", active, todo.content.trim()).as_bytes()).unwrap();
       }
       writer.flush().expect("Could not write to file!");
@@ -143,8 +167,6 @@ impl Todo {
 //          MAIN METHOD         //
 //==============================//
 
-pub const FILE_PATH: &str = "PATH_TO_YOUR_FILE.todo";
-
 pub const NO_SELECT: i16 = 0;
 pub const SELECT: i16 = 1;
 pub const MENU_BAR: i16 = 2;
@@ -152,13 +174,21 @@ pub const COMPLETED: i16 = 3;
 
 fn navigate_up(todo_len: usize, cursor_position: usize) -> usize
 {
+   if todo_len == 0 || cursor_position == 0 { return 0 };
+   return cursor_position - 1;
+}
+
+fn navigate_down(todo_len: usize, cursor_position: usize) -> usize
+{
    if todo_len == 0 { return 0 };
-   if todo_len- 1 == cursor_position { return cursor_position };
+   if todo_len == cursor_position + 1 { return cursor_position };
    return cursor_position + 1;
 }
 
 fn main()
 {
+   let FILE_PATH: &str = &get_file_env();
+
    initscr();
    noecho();
    curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
@@ -185,11 +215,14 @@ fn main()
    while run
    {
       mv(0, 0);
+      
       let spacing = print_controls(&controller);
       let mut index: i32 = -1;
+      let mut mapping: Vec<usize> = Vec::new();
+      
       if todos.todos.len() == 0
       {
-         mv(spacing as i32, 0);
+         mv(-1 + spacing as i32, 0);
          attron(COLOR_PAIR(SELECT));
          addstr("You have no TODOs, try creating some by pressing `a`");
          attroff(COLOR_PAIR(SELECT));
@@ -197,29 +230,30 @@ fn main()
       
       for todo in todos.todos.iter()
       {
-         if controller.tab != todo.active && controller.tab != TodoState::Other { continue; }
+         if todo.active != controller.tab && controller.tab != TodoState::Other { continue; }
          index += 1;
+         mapping.push(todo.id as usize);
          let state = if matches!(todo.active, TodoState::NotDone) {"- [ ]\t"} else if matches!(todo.active, TodoState::InProgress) {"- [-]\t"} else {"- [x]\t"};
          let hl: i16 = if index as usize == cursor_position {SELECT} else if matches!(todo.active, TodoState::Done) {COMPLETED} else {NO_SELECT};
-         mv(index + spacing as i32, 0); // Set Cursor to Beginning of next Line
+         mv(index + spacing as i32 - 1, 0); // Set Cursor to Beginning of next Line
          
          attron(COLOR_PAIR(hl));
          addstr(state);
-         addstr(&todo.content);
+         addstr(&todo.content.trim());
          attroff(COLOR_PAIR(hl));
       }
-      
+
       key = getch();
       refresh();
       match key as u8 as char
       {
-         'k' => { cursor_position = if cursor_position == 0 {0} else {cursor_position - 1}}
-         'j' => { cursor_position = navigate_up(todos.todos.len(), cursor_position)}
-         '\n' => { todos.toggle_todo(cursor_position as i32) }
-         'a' => { todos.add_todo_prompt() }
-         'r' => { if todos.remove_todo(cursor_position) {cursor_position = if cursor_position == 0 {0} else {cursor_position - 1}}}
-         'd' => { todos.set_in_progress(cursor_position as i32) }
-         'u' => { let pos = todos.undo(); cursor_position  = if pos == -1 {cursor_position} else {pos as usize}}
+         'k' => { cursor_position = navigate_up(mapping.len(), cursor_position)}
+         'j' => { cursor_position = navigate_down(mapping.len(), cursor_position)}
+         '\n' => { cursor_position = todos.toggle_todo(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32 } else { -1 }, &controller, cursor_position); }
+         'a' => { cursor_position = if todos.add_todo_prompt() { mapping.len() } else { cursor_position } }
+         'r' => { cursor_position = todos.remove_todo(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32} else { -1 }, &controller, cursor_position) }
+         'd' => { cursor_position = todos.set_in_progress(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32} else { -1}, &controller, cursor_position)}
+         'u' => { let pos = todos.undo(mapping.len()); cursor_position  = if pos == -1 {cursor_position} else {pos as usize}}
          'q' => { run = false; },
          's' => { todos.save(FILE_PATH) }
          '\t' => { controller.cycle_tab(); cursor_position = 0; }
