@@ -1,5 +1,6 @@
 # Todo app built in Rust
 
+![Todo App Preview](./images/td_preview.gif)
 ![Blank State](./images/empty_state.png)
 ![Todo Creation](./images/todo_creation.png)
 ![Todo List](./images/todo_list.png)
