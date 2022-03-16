@@ -1,6 +1,7 @@
 use ncurses::*; 
 use dialoguer::Input;
 
+use std::cmp::{min, max};
 use std::io::{Write, BufWriter};
 use std::fs::File;
 
@@ -93,6 +94,41 @@ impl Todo {
          return true;
       };
       return false;
+   }
+   
+   fn edit_todo(&mut self, length: usize, id: i32, cursor_position: usize) -> usize
+   {
+      if length == 0 || id < 0 { return 0; }
+      let index = self.todos.iter().position(|todo| todo.id == id).unwrap();
+      let original_todo = &self.todos[index];
+      
+      clear();
+      echo();
+      curs_set(CURSOR_VISIBILITY::CURSOR_VISIBLE);
+      mv(0, 0);
+
+      attron(COLOR_PAIR(SELECT));
+      addstr("Add a Todo: (Enter without text to exit)");
+      attroff(COLOR_PAIR(SELECT));
+      mv(1, 0);
+      refresh();
+      
+      let edited_content: String = Input::new()
+                                   .allow_empty(true)
+                                   .with_initial_text(original_todo.content.to_owned())
+                                   .interact_text()
+                                   .unwrap();
+
+      noecho();
+      curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
+
+      if edited_content.trim() == original_todo.content.trim() { return cursor_position; }
+      
+      if edited_content.trim().len() == 0 { return self.remove_todo(length, id, cursor_position); }
+      
+      self.todos[index].content = edited_content;
+      return cursor_position;
+      
    }
    
    fn toggle_todo(&mut self, length: usize, id: i32, controller: &PrintController, cursor_position: usize) -> usize
@@ -229,8 +265,9 @@ fn main()
          attroff(COLOR_PAIR(SELECT));
       }
       
-      for todo in todos.todos.iter()
+      for t in 0..min((LINES()) - spacing as i32, todos.todos.len() as i32)
       {
+         let todo = &todos.todos[t as usize];
          if todo.active != controller.tab && controller.tab != TodoState::Other { continue; }
          index += 1;
          mapping.push(todo.id as usize);
@@ -252,6 +289,7 @@ fn main()
          'j' => { cursor_position = navigate_down(mapping.len(), cursor_position)}
          '\n' => { cursor_position = todos.toggle_todo(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32 } else { -1 }, &controller, cursor_position); }
          'a' => { cursor_position = if todos.add_todo_prompt() { mapping.len() } else { cursor_position } }
+         'e' => { cursor_position = todos.edit_todo(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32 } else { -1 }, cursor_position) }
          'r' => { cursor_position = todos.remove_todo(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32} else { -1 }, cursor_position) }
          'd' => { cursor_position = todos.set_in_progress(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32} else { -1}, &controller, cursor_position)}
          'u' => { let pos = todos.undo(mapping.len()); cursor_position  = if pos == -1 {cursor_position} else {pos as usize}}
