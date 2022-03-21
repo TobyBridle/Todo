@@ -17,6 +17,11 @@ pub mod utils
             PrintController { tab: TodoState::Other }
         }
         
+        pub fn set_state(&mut self, state: TodoState)
+        {
+            self.tab = state;
+        }
+        
         pub fn cycle_tab(&mut self)
         {
             let mut states: Vec<TodoState> = Vec::new();

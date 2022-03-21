@@ -182,7 +182,7 @@ impl Todo {
       return length as i32;
    }
    
-   fn save(&self, file_path: &str)
+   fn save(&self, file_path: &str, controller: &PrintController)
    {
       let file = File::create(file_path).expect("Could not write to file!");
       let mut writer = BufWriter::new(file);
@@ -195,6 +195,7 @@ impl Todo {
             else {"In Progress: "};
          writer.write(format!("{}{}\n", active, todo.content.trim()).as_bytes()).unwrap();
       }
+      writer.write(format!("Filter: {}\n", (*controller).tab).as_bytes());
       writer.flush().expect("Could not write to file!");
    }
 }
@@ -246,7 +247,7 @@ fn main()
    
    let mut controller = PrintController::new();
    
-   load_from_file(FILE_PATH, &mut todos);
+   load_from_file(FILE_PATH, &mut todos, &mut controller);
 
    let mut key;
    while run
@@ -294,11 +295,11 @@ fn main()
          'd' => { cursor_position = todos.set_in_progress(mapping.len(), if mapping.len() > cursor_position { mapping[cursor_position] as i32} else { -1}, &controller, cursor_position)}
          'u' => { let pos = todos.undo(mapping.len()); cursor_position  = if pos == -1 {cursor_position} else {pos as usize}}
          'q' => { run = false; },
-         's' => { todos.save(FILE_PATH) }
+         's' => { todos.save(FILE_PATH, &controller) }
          '\t' => { controller.cycle_tab(); cursor_position = 0; }
          _ => { continue; }
       }
-      todos.save(FILE_PATH);
+      todos.save(FILE_PATH, &controller);
       endwin();
    }
    

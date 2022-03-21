@@ -5,6 +5,7 @@ pub mod utils
    use crate::_Todo;
    use crate::Todo;
    use crate::TodoState;
+   use crate::PrintController;
    
    pub fn get_file_env() -> String
    {
@@ -15,7 +16,7 @@ pub mod utils
       }
    }
 
-   pub fn load_from_file(file_path: &str, todo_container: &mut Todo) -> Result<(), std::io::Error>
+   pub fn load_from_file(file_path: &str, todo_container: &mut Todo, controller: &mut PrintController) -> Result<(), std::io::Error>
    {
       let file = File::open(file_path)?;
       let reader = BufReader::new(file);
@@ -28,7 +29,16 @@ pub mod utils
             else if _line.starts_with("Done: ") { TodoState::Done }
             else { TodoState::InProgress }
          };
+         if _line.starts_with("Filter: ")
+         {
+            if &_line[8..] == "Other" { controller.set_state(TodoState::Other); }
+            if &_line[8..] == "NotDone" { controller.set_state(TodoState::NotDone); }
+            if &_line[8..] == "InProgress" { controller.set_state(TodoState::InProgress); }
+            if &_line[8..] == "Done" { controller.set_state(TodoState::Done); }
+         } else
+         {
          todo_container.add_todo(_Todo { id: todo_container.todos.len() as i32, content: _line[active.to_string().len()+2..].to_string(), active });
+         }
       }
       Ok(())
    }
