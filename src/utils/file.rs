@@ -9,11 +9,17 @@ pub mod utils
    
    pub fn get_file_env() -> String
    {
+      let mut env: String;
       match std::env::var("TODO_FILE_LOCATION")
       {
-         Ok(val) => return val,
          Err(_e) => { println!("Could not find environment variable TODO_FILE_LOCATION!"); std::process::exit(1); }
+         Ok(val) => env=val,
       }
+      if (env.starts_with("~"))
+      {
+         return dirs::home_dir().unwrap().into_os_string().into_string().unwrap() + &env[1..];
+      }
+      return env;
    }
 
    pub fn load_from_file(file_path: &str, todo_container: &mut Todo, controller: &mut PrintController) -> Result<(), std::io::Error>
@@ -34,7 +40,7 @@ pub mod utils
             if &_line[8..] == "Other" { controller.set_state(TodoState::Other); }
             else if &_line[8..] == "NotDone" { controller.set_state(TodoState::NotDone); }
             else if &_line[8..] == "InProgress" { controller.set_state(TodoState::InProgress); }
-            else &_line[8..] == "Done" { controller.set_state(TodoState::Done); }
+            else { controller.set_state(TodoState::Done); }
          } else
          {
          todo_container.add_todo(_Todo { id: todo_container.todos.len() as i32, content: _line[active.to_string().len()+2..].to_string(), active });

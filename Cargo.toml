@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 ncurses = "5.101.0"
 dialoguer = "0.10.0"
+dirs = "1.0.4"
 
 [lib]
 name = "todo"
