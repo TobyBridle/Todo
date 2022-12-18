@@ -173,7 +173,8 @@ impl Todo {
     }
 
     pub fn save(&self, file_path: &str, controller: &PrintController) {
-        let file = File::create(file_path).expect("Could not write to file!");
+        let file = File::create(file_path)
+            .expect(&format!("Could not write to file {}!", file_path).to_owned());
         let mut writer = BufWriter::new(file);
 
         for todo in self.todos.clone() {
