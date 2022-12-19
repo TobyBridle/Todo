@@ -35,27 +35,6 @@ fn navigate_down(todo_len: usize, cursor_position: usize) -> usize {
     return cursor_position + 1;
 }
 
-impl _Todo
-{
-   fn new(content: String) -> _Todo {
-      _Todo {
-         id: -1,
-         active: TodoState::NotDone,
-         content,
-      }
-   }
-}
-
-//==============================//
-//    TODO STRUCT CONTAINER     //
-//==============================//
-
-pub struct Todo
-{
-   todos: Vec<_Todo>,
-   history: Vec<_Todo>,
-}
-
 fn main() {
     let file_path: &str = &get_file_env();
 
@@ -109,12 +88,16 @@ fn main() {
         let start: usize = if !has_overflowed {
             0
         } else {
-            LINES() as usize - spacing
+            // When we cross LINES() - spacing,
+            // we want to make n * (LINES() - spacing) be the top of the screen
+            // n * (LINES() - spacing) = cursor_position
+            let n = cursor_position / (LINES() as usize - spacing);
+            n * (LINES() as usize - spacing)
         };
         let end: usize = if !has_overflowed {
             min(todos.todos.len() as i32, LINES() - spacing as i32) as usize
         } else {
-            (LINES() - spacing as i32 + cursor_position as i32 - 1) as usize
+            start + LINES() as usize - spacing
         };
 
         for t in 0..todos.todos.len() {
@@ -158,17 +141,23 @@ fn main() {
 
         key = getch();
 
+        // If we have overflowed, we need
+        // to have a backup of the cursor position
+        // and then we need to set the cursor position
+        // to be relative
+        let mut relative_cursor_position = cursor_position;
+        if has_overflowed {
+            relative_cursor_position = cursor_position - start;
+        }
+
         match key as u8 as char {
             'k' => cursor_position = navigate_up(cursor_position),
             'j' => cursor_position = navigate_down(index as usize + 1, cursor_position),
             '\n' => {
                 cursor_position = todos.toggle_todo(
                     mapping.len(),
-                    if mapping.len() > cursor_position {
-                        mapping[cursor_position] as i32
-                    } else {
-                        -1
-                    },
+                    mapping[relative_cursor_position] as i32
+                    ,
                     &controller,
                     cursor_position,
                 );
@@ -181,35 +170,31 @@ fn main() {
                 }
             }
             'e' => {
-                cursor_position = todos.edit_todo(
+                let did_delete = todos.edit_todo(
                     mapping.len(),
-                    if mapping.len() > cursor_position {
-                        mapping[cursor_position] as i32
-                    } else {
-                        -1
-                    },
-                    cursor_position,
-                )
+                    mapping[cursor_position] as i32
+                );
+                if did_delete && cursor_position <= mapping.len() - 1 {
+                    cursor_position += 1;
+                }
             }
             'r' => {
-                cursor_position = todos.remove_todo(
+                if mapping.len() == 0 {
+                    continue;
+                }
+                todos.remove_todo(
                     mapping.len(),
-                    if mapping.len() > cursor_position {
-                        mapping[cursor_position] as i32
-                    } else {
-                        -1
-                    },
-                    cursor_position,
-                )
+                    mapping[relative_cursor_position] as i32
+                );
+                // If we are at the end of the list, we need to move the cursor up
+                if relative_cursor_position == mapping.len() - 1 && relative_cursor_position > 0 {
+                    cursor_position -= 1;
+                }
             }
             'd' => {
                 cursor_position = todos.set_in_progress(
                     mapping.len(),
-                    if mapping.len() > cursor_position {
-                        mapping[cursor_position] as i32
-                    } else {
-                        -1
-                    },
+                    mapping[relative_cursor_position] as i32,
                     &controller,
                     cursor_position,
                 )

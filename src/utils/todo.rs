@@ -51,9 +51,9 @@ impl Todo {
         return false;
     }
 
-    pub fn edit_todo(&mut self, length: usize, id: i32, cursor_position: usize) -> usize {
+    pub fn edit_todo(&mut self, length: usize, id: i32) -> bool {
         if length == 0 || id < 0 {
-            return 0;
+            return false;
         }
         let index = self.todos.iter().position(|todo| todo.id == id).unwrap();
         let original_todo = &self.todos[index];
@@ -79,15 +79,16 @@ impl Todo {
         curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
 
         if edited_content.trim() == original_todo.content.trim() {
-            return cursor_position;
+            return false;
         }
 
         if edited_content.trim().len() == 0 {
-            return self.remove_todo(length, id, cursor_position);
+            self.remove_todo(length, id);
+            return true;
         }
 
         self.todos[index].content = edited_content;
-        return cursor_position;
+        return false
     }
 
     pub fn toggle_todo(
@@ -140,24 +141,21 @@ impl Todo {
         return cursor_position;
     }
 
-    pub fn remove_todo(&mut self, length: usize, id: i32, cursor_position: usize) -> usize {
+    pub fn remove_todo(&mut self, length: usize, id: i32) {
         if length == 0 || id < 0 {
-            return 0;
+            return;
         }
 
+        // Length is only the length of
+        // the onscreen items, not the total
         self.history.push(self.todos[id as usize].clone());
         self.todos.remove(id as usize);
 
-        for i in (id as usize)..self.todos.len() {
-            self.todos[i].id -= 1;
+        for (i, todo) in self.todos.iter_mut().enumerate() {
+            todo.id = i as i32;
         }
 
         clear();
-
-        if cursor_position + 1 == length && cursor_position > 0 {
-            return cursor_position - 1;
-        }
-        return cursor_position;
     }
 
     pub fn undo(&mut self, length: usize) -> i32 {
